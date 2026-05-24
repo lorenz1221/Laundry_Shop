@@ -1,12 +1,9 @@
 <?php
 /**
  * Orders API — laundryshop_db.orders
- * GET    ?view=active|ledger|stats — active excludes completed; ledger includes all; stats for dashboard
+ * GET    ?view=active|ledger  — active excludes completed; ledger includes all
  * POST   — create order
- * PATCH  ?id=N — update status or payment_status
- * 
- * // DEMO CHECK [5] SUCCESS: SQL Injection Protected (Prepared Statements)
- * // DEMO CHECK [7] SUCCESS: Admin-Only Access Works (session checking)
+ * PATCH  ?id=N — update status (queue|washing|drying|ready|completed)
  */
 
 declare(strict_types=1);
@@ -20,7 +17,6 @@ $pdo  = getDbConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 
 const VALID_STATUSES = ['queue', 'washing', 'drying', 'ready', 'completed'];
-const VALID_PAYMENT_STATUSES = ['pending', 'paid'];
 
 function formatOrder(array $row): array
 {
@@ -63,7 +59,6 @@ function deductInventory(PDO $pdo, float $weightKg): void
     ];
     foreach ($deductions as $itemName => $amount) {
         if ($amount <= 0) continue;
-        // DEMO CHECK [5] SUCCESS: SQL Injection Protected - Prepared Statements
         $stmt = $pdo->prepare(
             'UPDATE inventory SET current_level = GREATEST(0, current_level - :amount) WHERE item_name = :name'
         );
@@ -75,48 +70,7 @@ try {
     if ($method === 'GET') {
         $view = $_GET['view'] ?? 'default';
 
-        // DEMO CHECK [7] SUCCESS: Admin-Only Access - check staff/admin role for admin views
-        if ($view === 'stats') {
-            if ($user['role'] !== 'staff' && $user['role'] !== 'admin') {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Admin access required.']);
-                exit;
-            }
-
-            // Executive Analytics for Dashboard
-            $revenueStmt = $pdo->query("SELECT COALESCE(SUM(total_fee), 0) as total FROM orders WHERE payment_status = 'paid'");
-            $totalRevenue = (float) $revenueStmt->fetch()['total'];
-
-            $weightStmt = $pdo->query("SELECT COALESCE(SUM(weight_kg), 0) as total FROM orders");
-            $totalWeight = (float) $weightStmt->fetch()['total'];
-
-            $customersStmt = $pdo->query("SELECT COUNT(DISTINCT customer_id) as total FROM orders WHERE customer_id IS NOT NULL");
-            $totalCustomers = (int) $customersStmt->fetch()['total'];
-
-            $activeOrdersStmt = $pdo->query("SELECT COUNT(*) as total FROM orders WHERE status != 'completed'");
-            $activeOrders = (int) $activeOrdersStmt->fetch()['total'];
-
-            $todayRevenueStmt = $pdo->query("SELECT COALESCE(SUM(total_fee), 0) as total FROM orders WHERE DATE(created_at) = CURDATE() AND payment_status = 'paid'");
-            $todayRevenue = (float) $todayRevenueStmt->fetch()['total'];
-
-            $pendingPaymentsStmt = $pdo->query("SELECT COUNT(*) as total FROM orders WHERE payment_status = 'pending' AND status != 'completed'");
-            $pendingPayments = (int) $pendingPaymentsStmt->fetch()['total'];
-
-            echo json_encode([
-                'success' => true,
-                'stats' => [
-                    'totalRevenue' => $totalRevenue,
-                    'totalWeight' => $totalWeight,
-                    'totalCustomers' => $totalCustomers,
-                    'activeOrders' => $activeOrders,
-                    'todayRevenue' => $todayRevenue,
-                    'pendingPayments' => $pendingPayments,
-                ],
-            ]);
-            exit;
-        }
-
-        if ($user['role'] === 'staff' || $user['role'] === 'admin') {
+        if ($user['role'] === 'staff') {
             if ($view === 'ledger') {
                 // Fiscal ledger: all records including completed
                 $stmt = $pdo->query('SELECT * FROM orders ORDER BY created_at DESC');
@@ -127,7 +81,6 @@ try {
                 );
             }
         } else {
-            // DEMO CHECK [5] SUCCESS: SQL Injection Protected - Prepared Statements
             $stmt = $pdo->prepare(
                 'SELECT * FROM orders WHERE customer_id = :uid ORDER BY created_at DESC'
             );
@@ -153,9 +106,8 @@ try {
         $scheduledTime   = $body['scheduledTime'] ?? null;
         $fulfillmentType = $body['fulfillmentType'] ?? 'dropoff';
         $paymentStatus   = $body['paymentStatus'] ?? 'pending';
-        $customerId      = ($user['role'] === 'staff' || $user['role'] === 'admin') ? ($body['customerId'] ?? null) : $user['id'];
+        $customerId      = $user['role'] === 'staff' ? ($body['customerId'] ?? null) : $user['id'];
 
-        // DEMO CHECK [10] SUCCESS: System Handles Invalid Input
         if ($weightKg <= 0 || $weightKg > 50) {
             http_response_code(422);
             echo json_encode(['success' => false, 'message' => 'Weight must be between 0.5 and 50 kg.']);
@@ -169,7 +121,6 @@ try {
 
         $totalFee = calculateFee($weightKg, $serviceType);
 
-        // DEMO CHECK [5] SUCCESS: SQL Injection Protected - Prepared Statements
         $stmt = $pdo->prepare(
             'INSERT INTO orders (
                 customer_id, customer_name, contact_phone, address_line1, address_line2, special_notes,
@@ -194,7 +145,7 @@ try {
             'stime'   => $scheduledTime ?: null,
             'fulfill' => in_array($fulfillmentType, ['dropoff', 'delivery'], true) ? $fulfillmentType : 'dropoff',
             'fee'     => $totalFee,
-            'pay'     => in_array($paymentStatus, VALID_PAYMENT_STATUSES, true) ? $paymentStatus : 'pending',
+            'pay'     => in_array($paymentStatus, ['pending', 'paid'], true) ? $paymentStatus : 'pending',
         ]);
 
         $orderId = (int) $pdo->lastInsertId();
@@ -213,8 +164,7 @@ try {
     }
 
     if ($method === 'PATCH') {
-        // DEMO CHECK [7] SUCCESS: Admin-Only Access - require staff/admin role for updates
-        if ($user['role'] !== 'staff' && $user['role'] !== 'admin') {
+        if ($user['role'] !== 'staff') {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Staff access required.']);
             exit;
@@ -222,40 +172,16 @@ try {
 
         $orderId = (int) ($_GET['id'] ?? 0);
         $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+        $status  = $body['status'] ?? '';
 
-        if ($orderId <= 0) {
+        if ($orderId <= 0 || !in_array($status, VALID_STATUSES, true)) {
             http_response_code(422);
-            echo json_encode(['success' => false, 'message' => 'Valid order id required.']);
+            echo json_encode(['success' => false, 'message' => 'Valid order id and status required.']);
             exit;
         }
 
-        // Handle status update
-        if (isset($body['status'])) {
-            $status = $body['status'];
-            if (!in_array($status, VALID_STATUSES, true)) {
-                http_response_code(422);
-                echo json_encode(['success' => false, 'message' => 'Invalid status value.']);
-                exit;
-            }
-
-            // DEMO CHECK [5] SUCCESS: SQL Injection Protected - Prepared Statements
-            $stmt = $pdo->prepare('UPDATE orders SET status = :status WHERE id = :id');
-            $stmt->execute(['status' => $status, 'id' => $orderId]);
-        }
-
-        // Handle payment status update (Interactive Payment Status Toggle)
-        if (isset($body['paymentStatus'])) {
-            $paymentStatus = $body['paymentStatus'];
-            if (!in_array($paymentStatus, VALID_PAYMENT_STATUSES, true)) {
-                http_response_code(422);
-                echo json_encode(['success' => false, 'message' => 'Invalid payment status value.']);
-                exit;
-            }
-
-            // DEMO CHECK [5] SUCCESS: SQL Injection Protected - Prepared Statements
-            $stmt = $pdo->prepare('UPDATE orders SET payment_status = :payment_status WHERE id = :id');
-            $stmt->execute(['payment_status' => $paymentStatus, 'id' => $orderId]);
-        }
+        $stmt = $pdo->prepare('UPDATE orders SET status = :status WHERE id = :id');
+        $stmt->execute(['status' => $status, 'id' => $orderId]);
 
         $fetch = $pdo->prepare('SELECT * FROM orders WHERE id = :id');
         $fetch->execute(['id' => $orderId]);
@@ -267,17 +193,9 @@ try {
             exit;
         }
 
-        $message = 'Order updated.';
-        if (isset($body['status']) && $body['status'] === 'completed') {
-            $message = 'Order completed and archived.';
-        }
-        if (isset($body['paymentStatus'])) {
-            $message = $body['paymentStatus'] === 'paid' ? 'Payment marked as Paid.' : 'Payment marked as Pending.';
-        }
-
         echo json_encode([
             'success' => true,
-            'message' => $message,
+            'message' => $status === 'completed' ? 'Order completed and archived.' : 'Order status updated.',
             'order'   => formatOrder($row),
         ]);
         exit;
