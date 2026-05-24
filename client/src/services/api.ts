@@ -4,8 +4,10 @@
 
 import { apiFetch } from '../api/apiHandler';
 import type {
+  ActivityLog,
   ApiResponse,
   CreateOrderPayload,
+  DashboardStats,
   InventoryItem,
   LoginPayload,
   Order,
@@ -13,6 +15,7 @@ import type {
   PaymentStatus,
   RegisterPayload,
   User,
+  UserManagement,
 } from '../types';
 
 // DATABASE HOOK: POST register.php → users INSERT
@@ -105,4 +108,77 @@ export function createDevUser(role: User['role']): User {
 /** @deprecated use fetchActiveOrders or fetchCustomerOrders */
 export async function fetchOrders(): Promise<Order[]> {
   return fetchActiveOrders();
+}
+
+// ============ EXECUTIVE ANALYTICS ============
+
+// DATABASE HOOK: GET orders.php?view=stats — dashboard metrics
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  const data = await apiFetch<{ success: boolean; stats: DashboardStats }>('/orders.php?view=stats');
+  return data.stats;
+}
+
+// ============ USER MANAGEMENT ============
+
+export interface UsersResponse {
+  success: boolean;
+  users: UserManagement[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    showing: { from: number; to: number };
+  };
+}
+
+// DATABASE HOOK: GET users.php — paginated user list
+export async function fetchUsers(page = 1, limit = 10, search = ''): Promise<UsersResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (search) params.set('search', search);
+  return apiFetch<UsersResponse>(`/users.php?${params}`);
+}
+
+// DATABASE HOOK: POST users.php — create user
+export async function createUser(payload: { name: string; email: string; password: string; role: string }): Promise<ApiResponse> {
+  return apiFetch<ApiResponse>('/users.php', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// DATABASE HOOK: PATCH users.php?id — update user
+export async function updateUser(userId: number, payload: Partial<{ name: string; email: string; password: string; role: string }>): Promise<ApiResponse> {
+  return apiFetch<ApiResponse>(`/users.php?id=${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+// DATABASE HOOK: DELETE users.php?id — delete user
+export async function deleteUser(userId: number, permanent = false): Promise<ApiResponse> {
+  return apiFetch<ApiResponse>(`/users.php?id=${userId}&permanent=${permanent}`, {
+    method: 'DELETE',
+  });
+}
+
+// ============ ACTIVITY LOGS ============
+
+export interface ActivityLogsResponse {
+  success: boolean;
+  logs: ActivityLog[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    showing: { from: number; to: number };
+  };
+}
+
+// DATABASE HOOK: GET activity_logs.php — paginated activity logs
+export async function fetchActivityLogs(page = 1, limit = 10, eventType = ''): Promise<ActivityLogsResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (eventType) params.set('eventType', eventType);
+  return apiFetch<ActivityLogsResponse>(`/activity_logs.php?${params}`);
 }

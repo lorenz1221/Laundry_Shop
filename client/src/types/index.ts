@@ -111,3 +111,44 @@ export const SERVICE_OPTIONS: { value: ServiceType; label: string; rate: number 
 
 export const MAX_WEIGHT_KG = 50;
 export const MIN_WEIGHT_KG = 0.5;
+
+/** Executive Analytics Stats */
+export interface DashboardStats {
+  totalRevenue: number;
+  totalWeight: number;
+  totalCustomers: number;
+  activeOrders: number;
+  todayRevenue: number;
+  pendingPayments: number;
+}
+
+/** Activity Log entry */
+export interface ActivityLog {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  eventType: 'login' | 'logout';
+  description: string;
+  ipAddress: string;
+  createdAt: string;
+}
+
+/** Paginated response structure */
+export interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    showing: { from: number; to: number };
+  };
+}
+
+/** User management types */
+export interface UserManagement extends User {
+  createdAt?: string;
+  isDeleted?: boolean;
+}
