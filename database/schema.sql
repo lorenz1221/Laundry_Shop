@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   name          VARCHAR(255)   NOT NULL,
   email         VARCHAR(255)   NOT NULL UNIQUE,
   password      VARCHAR(255)   NOT NULL COMMENT 'bcrypt hash via PASSWORD_BCRYPT',
-  role          ENUM('customer', 'staff') NOT NULL DEFAULT 'customer',
+  role          ENUM('customer', 'staff', 'admin') NOT NULL DEFAULT 'customer',
   phone         VARCHAR(50)    NULL,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,6 +57,18 @@ INSERT INTO inventory (item_name, current_level, max_level, unit) VALUES
   ('Bleach',     60, 100, 'L')
 ON DUPLICATE KEY UPDATE item_name = item_name;
 
+-- activity_logs: IT-10 system activity tracker
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NULL,
+  action      VARCHAR(100) NOT NULL,
+  details     TEXT NULL,
+  ip_address  VARCHAR(45) NULL,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
 INSERT INTO users (name, email, password, role) VALUES
-  ('Demo Staff', 'staff@spinzone.com', '$2y$10$4rZWTrS8L6yfSNwVRy81YO0JS8x9i2Y9GJs3CPC1stgAscIuESkGW', 'staff')
+  ('Demo Staff', 'staff@spinzone.com', '$2y$10$4rZWTrS8L6yfSNwVRy81YO0JS8x9i2Y9GJs3CPC1stgAscIuESkGW', 'staff'),
+  ('Demo Admin', 'admin@spinzone.com', '$2y$10$4rZWTrS8L6yfSNwVRy81YO0JS8x9i2Y9GJs3CPC1stgAscIuESkGW', 'admin')
 ON DUPLICATE KEY UPDATE email = email;

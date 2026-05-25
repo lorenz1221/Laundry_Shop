@@ -1,0 +1,15 @@
+# Environment files (keep .env.example tracked)
+server/.env
+client/.env
+server/vendor/
+composer.phar
+server-legacy-php/
+
+# Dependencies & build
+client/node_modules/
+client/dist/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.log
