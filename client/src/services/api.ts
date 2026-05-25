@@ -6,6 +6,7 @@ import { apiHandler } from '../api/apiHandler';
 import type {
   ApiResponse,
   CreateOrderPayload,
+  CreateUserPayload,
   DashboardStats,
   InventoryItem,
   LoginPayload,
@@ -13,7 +14,9 @@ import type {
   OrderStatus,
   PaymentStatus,
   RegisterPayload,
+  UpdateUserPayload,
   User,
+  UsersResponse,
 } from '../types';
 
 export async function registerUser(payload: RegisterPayload): Promise<ApiResponse> {
@@ -99,4 +102,35 @@ export function createDevUser(role: User['role']): User {
           : 'dev.customer@spinzone.local',
     role,
   };
+}
+
+export async function fetchUsers(page = 1, perPage = 10, search = '', role = ''): Promise<UsersResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    per_page: perPage.toString(),
+  });
+  if (search) params.append('search', search);
+  if (role) params.append('role', role);
+
+  return apiHandler<UsersResponse>({ url: `/users?${params}`, method: 'GET' });
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<User> {
+  const data = await apiHandler<ApiResponse>({ url: '/users', method: 'POST', data: payload });
+  if (!data.user) throw new Error('User creation failed');
+  return data.user;
+}
+
+export async function updateUser(userId: number, payload: UpdateUserPayload): Promise<User> {
+  const data = await apiHandler<ApiResponse>({
+    url: `/users/${userId}`,
+    method: 'PUT',
+    data: payload,
+  });
+  if (!data.user) throw new Error('User update failed');
+  return data.user;
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  await apiHandler<ApiResponse>({ url: `/users/${userId}`, method: 'DELETE' });
 }

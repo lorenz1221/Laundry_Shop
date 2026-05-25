@@ -6,12 +6,11 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    // Proxy /api/* to XAMPP PHP backend (laundryshop_db endpoints)
+    // Proxy /api/* to Laravel dev server
     proxy: {
       '/api': {
-        target: 'http://localhost',
+        target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/Laundry_Shop/server/public/api'),
       },
     },
   },

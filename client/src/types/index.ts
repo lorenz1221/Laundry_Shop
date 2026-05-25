@@ -7,6 +7,9 @@ export interface User {
   name: string;
   email: string;
   role: 'customer' | 'staff' | 'admin'; // staff kept for legacy sessions; routes as admin
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /** orders.status ENUM in laundryshop_db */
@@ -121,3 +124,30 @@ export const SERVICE_OPTIONS: { value: ServiceType; label: string; rate: number 
 
 export const MAX_WEIGHT_KG = 50;
 export const MIN_WEIGHT_KG = 0.5;
+
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  password: string;
+  role: 'customer' | 'staff' | 'admin';
+  phone?: string;
+}
+
+export interface UpdateUserPayload {
+  name: string;
+  email: string;
+  password?: string;
+  role: 'customer' | 'staff' | 'admin';
+  phone?: string;
+}
+
+export interface UsersResponse {
+  success: boolean;
+  data: User[];
+  pagination: {
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+  };
+}

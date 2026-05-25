@@ -15,12 +15,14 @@ import AnalyticsCards from '../components/AnalyticsCards';
 import FinancialLedger from '../components/staff/FinancialLedger';
 import InventoryMonitor from '../components/staff/InventoryMonitor';
 import OperationalQueue from '../components/staff/OperationalQueue';
+import UserManagement from '../components/admin/UserManagement';
 
 const NAV = [
   { id: 'overview' as PortalSection, label: 'Overview', icon: '📊' },
   { id: 'queue' as PortalSection, label: 'Active Queue', icon: '📋' },
   { id: 'ledger' as PortalSection, label: 'Financial Ledger', icon: '💰' },
   { id: 'inventory' as PortalSection, label: 'Supplies', icon: '🧴' },
+  { id: 'users' as PortalSection, label: 'Users', icon: '👥' },
 ];
 
 const DEFAULT_STATS: DashboardStats = {
@@ -95,6 +97,7 @@ export default function AdminDashboard() {
           )}
           {section === 'ledger' && <FinancialLedger orders={ledgerOrders} />}
           {section === 'inventory' && <InventoryMonitor items={inventory} />}
+          {section === 'users' && <UserManagement />}
         </>
       )}
     </PortalLayout>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\RecaptchaController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -31,6 +32,13 @@ Route::middleware(['web'])->group(function () {
         Route::middleware('role:staff,admin')->group(function () {
             Route::patch('/orders/{id}/payment', [PaymentController::class, 'update']);
             Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+        });
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/users', [UserController::class, 'index']);
+            Route::post('/users', [UserController::class, 'store']);
+            Route::put('/users/{id}', [UserController::class, 'update']);
+            Route::delete('/users/{id}', [UserController::class, 'destroy']);
         });
     });
 
